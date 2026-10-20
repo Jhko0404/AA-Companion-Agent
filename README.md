@@ -12,7 +12,6 @@ AA-Companion-Agent/
 ├── README.md                                   # [메인 가이드] Companion Agent 단계별 콘솔 설정 및 시뮬레이터 테스트 가이드
 ├── assets/                                     # 콘솔 UI 설정 화면 및 아키텍처 다이어그램 이미지
 │   ├── add_guidance_instruction_ui.png         # Add guidance instruction 설정 팝업 화면
-│   ├── simulator_test_troubleshooting.png      # 시뮬레이터 도구 호출 점검 및 트러블슈팅 화면
 │   └── enterprise_integration_architecture.png # CCaaS · Agent Assist · 상담원 데스크톱 3-Plane 연동 아키텍처
 ├── docs/                                       # 심화 아키텍처 및 베스트 프랙티스 문서
 │   ├── 01-companion-agent-overview.md          # Companion Agent 개념, 동작 모드 및 화면 구성 개요
@@ -46,7 +45,6 @@ AA-Companion-Agent/
 4. [실전 시연용 턴바이턴(Turn-by-Turn) 대화 시나리오](#4-실전-시연용-턴바이턴turn-by-turn-대화-시나리오)
 5. [프로덕션 확장을 위한 설계 베스트 프랙티스](#5-프로덕션-확장을-위한-설계-베스트-프랙티스)
 6. [API 및 상담원 데스크톱(UI) 연동 레퍼런스](#6-api-및-상담원-데스크톱ui-연동-레퍼런스)
-7. [트러블슈팅(Troubleshooting) 및 실전 FAQ](#7-트러블슈팅troubleshooting-및-실전-faq)
 
 ---
 
@@ -615,48 +613,3 @@ curl -s -X GET \
   "https://ces.googleapis.com/v1beta/projects/${PROJECT_ID}/locations/${LOCATION}/apps/${CES_APP_ID}/toolsets" \
   | jq '.toolsets[] | {displayName: .displayName, name: .name}'
 ```
-
----
-
-## 7. 트러블슈팅(Troubleshooting) 및 실전 FAQ
-
-실제 설정 및 시뮬레이터 테스트 과정에서 가장 자주 발생하는 5가지 이슈와 해결 방법입니다.
-
----
-
-### Q1. `Model Guidance` 저장 시 `Overarching guidance length exceeds max token count 500.` 에러가 발생합니다.
-- **원인**: Companion Agent의 **Model Guidance** 입력란은 시스템적으로 **최대 500 토큰**(한국어 기준 공백 포함 약 250~300자 내외) 제한이 적용되어 있습니다.
-- **해결 방법**: 개별 시나리오의 상세 절차는 각 Guidance 카드의 `Step*`에 작성하고, `Model Guidance`에는 [Step 4의 170토큰 압축 템플릿](#step-4-model-guidance-글로벌-지침-설정하기)처럼 역할, 금액 포맷, 영문 항목 번역, 도구 호출 제한만 간결하게 입력합니다.
-
----
-
-### Q2. 정수기 필터 교체 주기를 물었을 때(TC-04), 코칭 카드에 답변 텍스트 없이 `🔧 Custom layout search 2 ✅`만 4번 연속 뜨고 멈춥니다.
-
-![시뮬레이터 도구 4회 연속 호출 현상 및 해결](assets/simulator_test_troubleshooting.png)
-
-- **원인**:
-  1. `Custom layout search 2`가 검색하는 정수기 매뉴얼 PDF 원본(`PC-5820L-Manual`)에는 **"필터 교환 방법"**만 있고 **"필터별 교환 주기(몇 개월)" 숫자 데이터가 없습니다.**
-  2. 지침에 교환 주기(개월 수) 정보가 없고 1회 호출 제한이 없으면, AI 모델이 개월 수를 찾기 위해 검색어를 바꿔가며 **한 턴당 최대 도구 호출 횟수(4회)**까지 `Custom layout search 2`를 반복 호출하다가 텍스트 생성 단계로 넘어가지 못하고 종료됩니다.
-- **해결 방법**:
-  - [Step 3의 Guidance 카드 3](#💡-guidance-카드-3-정수기-매뉴얼--필터-교환-주기--자가-점검-안내) 및 [Step 4의 Model Guidance](#step-4-model-guidance-글로벌-지침-설정하기)와 같이 **`"custom_layout_search_2 도구를 딱 1회만 호출한 뒤 추가 재검색 없이 즉시 답변을 작성하세요"`** 문구와 **`"필터 교환 주기는 네오센스 6개월, RO 멤브레인 20개월, 플러스이노센스 18개월"`** 기준값을 함께 넣어주면 1회 호출 후 즉시 완벽한 코칭 답변이 생성됩니다.
-
----
-
-### Q3. 새로운 고객 질문을 입력했는데 우측 상단 코칭 카드 제목이 이전 카드(`당월 청구서 상세 조회`)에 머물러 있습니다.
-- **원인**:
-  1. 시뮬레이터 우측 상단 코칭 카드 패널은 여러 장의 카드가 생성되면 카드 헤더 우측에 **`<` `>` `>|` 페이지 이동 화살표**를 표시합니다.
-  2. 또한 좌측 대화창에서 상담사(`Agent`)의 답변 없이 고객(`Customer`) 메시지만 연속으로 여러 번 입력하면 이전 카드의 Step이 아직 진행 중인 것으로 판단할 수 있습니다.
-- **해결 방법**:
-  - 각 고객 질문 후에는 `Agent` 입력창에 간단히 응대 멘트를 입력해 턴을 마무리하고, 우측 상단 카드 헤더의 **`>|` (가장 최신 카드로 이동)** 버튼을 클릭하여 새로 생성된 카드를 확인하세요. 새로운 시나리오를 처음부터 깔끔하게 테스트할 때는 우측 상단의 **`Start over`** 버튼을 클릭합니다.
-
----
-
-### Q4. 청구서 조회 도구(`compare_invoices`, `get_invoice_breakdown`) 호출 시 `unauthenticated` 또는 `no account` 에러가 반환됩니다.
-- **원인**: CXAS Python 도구 코드 내부에서 `context.state.get("auth_status")`와 `context.state.get("account_id")`를 검사할 때, Agent Assist 시뮬레이터 세션에는 CXAS 앱의 기본 변수가 자동 주입되지 않아 빈 문자열(`""`)로 평가되기 때문입니다.
-- **해결 방법**: [2.2절의 Python 도구 Fallback 설정](#22-python-청구서-도구의-세션-변수contextstate-기본값-fallback-확인)과 같이 `auth_status = context.state.get("auth_status") or "authenticated"` 및 `account_id = context.state.get("account_id") or "ACC-2026-001"`로 기본값을 지정하고 CXAS에서 도구를 저장합니다.
-
----
-
-### Q5. 상담사가 첫인사("안녕하세요, 퓨어케어 고객센터입니다")를 건넸을 때 코칭 카드가 불필요하게 미리 발동합니다.
-- **원인**: 전체 트리거 또는 카드별 트리거가 `End of utterance`로 설정되어 있어 상담사의 발화 직후에도 카드 조건 평가가 실행되었기 때문입니다(Opening Utterance Trap).
-- **해결 방법**: Companion Agent의 기본 **Triggering event** 및 각 Guidance 카드의 **Instruction-level trigger (`Trigger*`)**를 **`Customer message`**로 설정하면 오직 고객이 발화했을 때만 코칭 카드가 동작합니다.
